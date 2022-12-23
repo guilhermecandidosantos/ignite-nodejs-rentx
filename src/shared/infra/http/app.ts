@@ -7,6 +7,7 @@ import "dotenv/config";
 import swaggerUi from "swagger-ui-express";
 
 import { AppError } from "@shared/errors/AppError";
+import rateLimiter from "@shared/infra/http/middlewares/rateLimiter";
 // eslint-disable-next-line import-helpers/order-imports
 import createConnection from "@shared/infra/typeorm";
 
@@ -23,6 +24,8 @@ import { routes } from "./routes";
 createConnection();
 
 const app = express();
+
+app.use(rateLimiter);
 
 app.use(express.json());
 
