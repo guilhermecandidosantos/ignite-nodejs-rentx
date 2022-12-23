@@ -1,20 +1,21 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
+/* eslint-disable import-helpers/order-imports */
 import cors from "cors";
-// eslint-disable-next-line import-helpers/order-imports
 import express, { Request, Response, NextFunction } from "express";
+import swaggerUi from "swagger-ui-express";
+
+import * as Sentry from "@sentry/node";
+import * as Tracing from "@sentry/tracing";
 
 import "reflect-metadata";
 import "dotenv/config";
-import swaggerUi from "swagger-ui-express";
 
 import { AppError } from "@shared/errors/AppError";
 import rateLimiter from "@shared/infra/http/middlewares/rateLimiter";
-// eslint-disable-next-line import-helpers/order-imports
 import createConnection from "@shared/infra/typeorm";
 
-// eslint-disable-next-line import-helpers/order-imports
 import upload from "@config/upload";
 
-// eslint-disable-next-line import-helpers/order-imports
 import swaggerFile from "../../../swagger.json";
 import "@shared/container";
 import "express-async-errors";
@@ -27,6 +28,19 @@ const app = express();
 
 app.use(rateLimiter);
 
+Sentry.init({
+  dsn: process.env.SENTRY_DSN,
+  integrations: [
+    new Sentry.Integrations.Http({ tracing: true }),
+    new Tracing.Integrations.Express({ app }),
+  ],
+
+  tracesSampleRate: 1.0,
+});
+
+app.use(Sentry.Handlers.requestHandler());
+app.use(Sentry.Handlers.tracingHandler());
+
 app.use(express.json());
 
 app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerFile));
@@ -38,8 +52,9 @@ app.use(cors());
 
 app.use(routes);
 
+app.use(Sentry.Handlers.errorHandler());
+
 app.use(
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   (err: Error, request: Request, response: Response, next: NextFunction) => {
     if (err instanceof AppError) {
       return response.status(err.statusCode).json({ message: err.message });
